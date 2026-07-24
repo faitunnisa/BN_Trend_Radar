@@ -218,24 +218,33 @@ function initials(name: string): string {
 }
 
 function formatDate(value: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function formatDateOnly(value: string): string {
+  if (!value) return "—";
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(`${value}T12:00:00`));
+  }).format(date);
 }
 
 function formatDateRange(startDate: string, endDate: string): string {
+  if (!startDate || !endDate) return "Select date range";
   if (startDate === endDate) return formatDateOnly(startDate);
   return `${formatDateOnly(startDate)} – ${formatDateOnly(endDate)}`;
 }
@@ -479,8 +488,12 @@ export function TrendRadarApp() {
   );
   const [workspace, setWorkspace] =
     useState<BootstrapData | null>(null);
-  const [dateRange, setDateRange] = useState<DateRange>({ startDate: "", endDate: "" });
-  const [dateDraft, setDateDraft] = useState<DateRange>({ startDate: "", endDate: "" });
+  const [dateRange, setDateRange] = useState<DateRange>(() =>
+    createDefaultDateRange(),
+  );
+  const [dateDraft, setDateDraft] = useState<DateRange>(() =>
+    createDefaultDateRange(),
+  );
   const [view, setView] = useState<View>("dashboard");
   const [mobileNav, setMobileNav] = useState(false);
   const [initializing, setInitializing] = useState(true);
