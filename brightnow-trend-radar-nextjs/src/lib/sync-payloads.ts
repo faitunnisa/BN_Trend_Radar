@@ -43,7 +43,7 @@ export async function buildTrendPayload(
     record_type: "trend_submission",
     id: trend.id,
     created_at: trend.created_at,
-    week: trend.submission_week,
+    observed_date: trend.observed_date,
     title: trend.title,
     category: trend.category,
     platform: trend.platform,
@@ -69,38 +69,37 @@ export async function buildActionPayload(
     .single();
   if (error) throw error;
 
-  const [sourceResult, ownerResult, updaterResult] =
-    await Promise.all([
-      action.source_trend_id
-        ? supabaseAdmin
-            .from("trends")
-            .select("title")
-            .eq("id", action.source_trend_id)
-            .single()
-        : Promise.resolve({ data: null, error: null }),
-      supabaseAdmin
-        .from("app_users")
-        .select("display_name")
-        .eq("id", action.accountable_user_id)
-        .single(),
-      supabaseAdmin
-        .from("app_users")
-        .select("display_name")
-        .eq("id", action.updated_by)
-        .single(),
-    ]);
+  const [sourceResult, ownerResult, updaterResult] = await Promise.all([
+    action.source_trend_id
+      ? supabaseAdmin
+          .from("trends")
+          .select("title")
+          .eq("id", action.source_trend_id)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    supabaseAdmin
+      .from("app_users")
+      .select("display_name")
+      .eq("id", action.accountable_user_id)
+      .single(),
+    supabaseAdmin
+      .from("app_users")
+      .select("display_name")
+      .eq("id", action.updated_by)
+      .single(),
+  ]);
 
   return {
     record_type: "action",
     id: action.id,
     created_at: action.created_at,
     updated_at: action.updated_at,
-    week: action.workspace_week,
+    start_date: action.start_date,
+    end_date: action.end_date,
     title: action.title,
     source_trend_id: action.source_trend_id || "",
     source_trend_title: sourceResult.data?.title || "Standalone",
     accountable: ownerResult.data?.display_name || "",
-    work_period: action.work_period,
     status: action.status,
     updated_by: updaterResult.data?.display_name || "",
   };
@@ -116,31 +115,31 @@ export async function buildLearningPayload(
     .single();
   if (error) throw error;
 
-  const [actionResult, trendResult, ownerResult] =
-    await Promise.all([
-      supabaseAdmin
-        .from("actions")
-        .select("title")
-        .eq("id", learning.source_action_id)
-        .single(),
-      learning.source_trend_id
-        ? supabaseAdmin
-            .from("trends")
-            .select("title")
-            .eq("id", learning.source_trend_id)
-            .single()
-        : Promise.resolve({ data: null, error: null }),
-      supabaseAdmin
-        .from("app_users")
-        .select("display_name")
-        .eq("id", learning.action_owner_id)
-        .single(),
-    ]);
+  const [actionResult, trendResult, ownerResult] = await Promise.all([
+    supabaseAdmin
+      .from("actions")
+      .select("title")
+      .eq("id", learning.source_action_id)
+      .single(),
+    learning.source_trend_id
+      ? supabaseAdmin
+          .from("trends")
+          .select("title")
+          .eq("id", learning.source_trend_id)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    supabaseAdmin
+      .from("app_users")
+      .select("display_name")
+      .eq("id", learning.action_owner_id)
+      .single(),
+  ]);
 
   return {
     record_type: "learning",
     id: learning.id,
     created_at: learning.published_at,
+    published_date: learning.published_date,
     title: learning.title,
     source_trend_id: learning.source_trend_id || "",
     source_trend_title: trendResult.data?.title || "Standalone",

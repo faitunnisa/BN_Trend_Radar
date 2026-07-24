@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { data: trend, error } = await supabaseAdmin
       .from("trends")
       .insert({
-        submission_week: input.submissionWeek,
+        observed_date: input.observedDate,
         title: input.title,
         category: input.category,
         platform: input.platform,

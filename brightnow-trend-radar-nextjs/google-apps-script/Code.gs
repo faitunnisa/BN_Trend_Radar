@@ -18,19 +18,19 @@ const LEARNING_SHEET = 'Learning Library';
 const LOG_SHEET = 'Connector Log';
 
 const TREND_HEADERS = [
-  'record_type','id','created_at','week','title','category','platform',
+  'record_type','id','created_at','observed_date','title','category','platform',
   'momentum','source','relevance','suggested_action','submitter',
   'division','votes','opportunity_score','status','received_at'
 ];
 
 const ACTION_HEADERS = [
-  'record_type','id','created_at','updated_at','week','action',
-  'source_trend_id','source_trend_title','accountable','work_period',
+  'record_type','id','created_at','updated_at','start_date','end_date','action',
+  'source_trend_id','source_trend_title','accountable',
   'status','updated_by','received_at'
 ];
 
 const LEARNING_HEADERS = [
-  'record_type','id','created_at','learning_title',
+  'record_type','id','created_at','published_date','learning_title',
   'source_trend_id','source_trend_title',
   'source_action_id','source_action_title','action_owner',
   'result','what_worked','what_didnt_work','why_it_happened',
@@ -60,7 +60,7 @@ function doPost(e) {
         payload.record_type || '',
         payload.id || '',
         payload.created_at || '',
-        payload.week || '',
+        payload.observed_date || '',
         payload.title || '',
         payload.category || '',
         payload.platform || '',
@@ -85,12 +85,12 @@ function doPost(e) {
         payload.id || '',
         payload.created_at || '',
         payload.updated_at || '',
-        payload.week || '',
+        payload.start_date || '',
+        payload.end_date || '',
         payload.title || '',
         payload.source_trend_id || '',
         payload.source_trend_title || '',
         payload.accountable || '',
-        payload.work_period || '',
         payload.status || '',
         payload.updated_by || '',
         receivedAt
@@ -104,6 +104,7 @@ function doPost(e) {
         payload.record_type || '',
         payload.id || '',
         payload.created_at || '',
+        payload.published_date || '',
         payload.title || '',
         payload.source_trend_id || '',
         payload.source_trend_title || '',

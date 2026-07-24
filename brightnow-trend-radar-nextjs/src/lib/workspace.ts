@@ -27,38 +27,50 @@ function scoreInput(row: AnyRow): TrendScoreInput {
   };
 }
 
+function unique(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
 export async function getWorkspaceData(
-  week: string,
+  startDate: string,
+  endDate: string,
   currentUser: AppUser,
 ): Promise<BootstrapData> {
-  const [
-    divisionResult,
-    users,
-    trendResult,
-    actionResult,
-    sheetSync,
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("divisions")
-      .select("id,name,is_active")
-      .order("name"),
-    listUsers(false),
-    supabaseAdmin
-      .from("trends")
-      .select("*")
-      .eq("submission_week", week)
-      .order("created_at", { ascending: false }),
-    supabaseAdmin
-      .from("actions")
-      .select("*")
-      .eq("workspace_week", week)
-      .order("created_at", { ascending: false }),
-    getSheetSyncStatus(),
-  ]);
+  const [divisionResult, users, trendResult, actionResult, learningResult, sheetSync] =
+    await Promise.all([
+      supabaseAdmin
+        .from("divisions")
+        .select("id,name,is_active")
+        .order("name"),
+      listUsers(false),
+      supabaseAdmin
+        .from("trends")
+        .select("*")
+        .gte("observed_date", startDate)
+        .lte("observed_date", endDate)
+        .order("observed_date", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("actions")
+        .select("*")
+        .lte("start_date", endDate)
+        .gte("end_date", startDate)
+        .order("start_date", { ascending: true })
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("learnings")
+        .select("*")
+        .gte("published_date", startDate)
+        .lte("published_date", endDate)
+        .order("published_date", { ascending: false })
+        .order("published_at", { ascending: false }),
+      getSheetSyncStatus(),
+    ]);
 
   if (divisionResult.error) throw divisionResult.error;
   if (trendResult.error) throw trendResult.error;
   if (actionResult.error) throw actionResult.error;
+  if (learningResult.error) throw learningResult.error;
 
   const divisions: Division[] = (divisionResult.data || []).map(
     (row: AnyRow) => ({
@@ -68,18 +80,15 @@ export async function getWorkspaceData(
     }),
   );
 
-  const userMap = new Map(users.map((user) => [user.id, user]));
+  const userMap = new Map<string, AppUser>(
+    users.map((user: AppUser) => [user.id, user]),
+  );
   const trendRows = (trendResult.data || []) as AnyRow[];
   const actionRows = (actionResult.data || []) as AnyRow[];
+  const learningRows = (learningResult.data || []) as AnyRow[];
   const trendIds = trendRows.map((row) => row.id);
-  const actionIds = actionRows.map((row) => row.id);
 
-  const [
-    voteResult,
-    scoreResult,
-    historyResult,
-    learningResult,
-  ] = await Promise.all([
+  const [voteResult, scoreResult, historyResult] = await Promise.all([
     trendIds.length
       ? supabaseAdmin
           .from("trend_votes")
@@ -99,43 +108,70 @@ export async function getWorkspaceData(
           .in("trend_id", trendIds)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
-    actionIds.length
-      ? supabaseAdmin
-          .from("learnings")
-          .select("*")
-          .in("source_action_id", actionIds)
-          .order("published_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (voteResult.error) throw voteResult.error;
   if (scoreResult.error) throw scoreResult.error;
   if (historyResult.error) throw historyResult.error;
-  if (learningResult.error) throw learningResult.error;
 
-  const votes = (voteResult.data || []) as AnyRow[];
-  const scores = (scoreResult.data || []) as AnyRow[];
-  const histories = (historyResult.data || []) as AnyRow[];
-  const learningRows = (learningResult.data || []) as AnyRow[];
+  const displayedTrendMap = new Map<string, string>(
+    trendRows.map((row) => [String(row.id), String(row.title)]),
+  );
+  const displayedActionMap = new Map<string, string>(
+    actionRows.map((row) => [String(row.id), String(row.title)]),
+  );
 
-  const trendTitleMap = new Map(
-    trendRows.map((row) => [row.id, row.title]),
-  );
-  const actionTitleMap = new Map(
-    actionRows.map((row) => [row.id, row.title]),
-  );
+  const neededTrendIds = unique([
+    ...actionRows.map((row) => row.source_trend_id),
+    ...learningRows.map((row) => row.source_trend_id),
+  ]).filter((id) => !displayedTrendMap.has(id));
+
+  const neededActionIds = unique(
+    learningRows.map((row) => row.source_action_id),
+  ).filter((id) => !displayedActionMap.has(id));
+
+  const [extraTrendResult, extraActionResult] = await Promise.all([
+    neededTrendIds.length
+      ? supabaseAdmin
+          .from("trends")
+          .select("id,title")
+          .in("id", neededTrendIds)
+      : Promise.resolve({ data: [], error: null }),
+    neededActionIds.length
+      ? supabaseAdmin
+          .from("actions")
+          .select("id,title")
+          .in("id", neededActionIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (extraTrendResult.error) throw extraTrendResult.error;
+  if (extraActionResult.error) throw extraActionResult.error;
+
+  const trendTitleMap = new Map<string, string>([
+    ...displayedTrendMap,
+    ...((extraTrendResult.data || []) as AnyRow[]).map(
+      (row) => [row.id, row.title] as [string, string],
+    ),
+  ]);
+  const actionTitleMap = new Map<string, string>([
+    ...displayedActionMap,
+    ...((extraActionResult.data || []) as AnyRow[]).map(
+      (row) => [row.id, row.title] as [string, string],
+    ),
+  ]);
   const learningByAction = new Map(
     learningRows.map((row) => [row.source_action_id, row]),
   );
 
+  const votes = (voteResult.data || []) as AnyRow[];
+  const scores = (scoreResult.data || []) as AnyRow[];
+  const histories = (historyResult.data || []) as AnyRow[];
+
   const trends: Trend[] = trendRows.map((row) => {
     const submitter = userMap.get(row.submitted_by);
-    const trendVotes = votes.filter(
-      (vote) => vote.trend_id === row.id,
-    );
-    const trendScores = scores.filter(
-      (score) => score.trend_id === row.id,
-    );
+    const trendVotes = votes.filter((vote) => vote.trend_id === row.id);
+    const trendScores = scores.filter((score) => score.trend_id === row.id);
     const averageScore = trendScores.length
       ? trendScores.reduce(
           (sum, score) => sum + Number(score.final_score),
@@ -160,7 +196,7 @@ export async function getWorkspaceData(
 
     return {
       id: row.id,
-      submissionWeek: row.submission_week,
+      observedDate: row.observed_date,
       title: row.title,
       category: row.category,
       platform: row.platform,
@@ -193,7 +229,8 @@ export async function getWorkspaceData(
 
     return {
       id: row.id,
-      workspaceWeek: row.workspace_week,
+      startDate: row.start_date,
+      endDate: row.end_date,
       sourceTrendId: row.source_trend_id,
       sourceTrendTitle: row.source_trend_id
         ? trendTitleMap.get(row.source_trend_id) || null
@@ -202,7 +239,6 @@ export async function getWorkspaceData(
       accountableUserId: row.accountable_user_id,
       accountableName: owner?.displayName || "Unknown",
       accountableDivision: owner?.divisionName || "Unassigned",
-      workPeriod: row.work_period,
       status: row.status,
       createdById: row.created_by,
       updatedById: row.updated_by,
@@ -217,6 +253,7 @@ export async function getWorkspaceData(
     const owner = userMap.get(row.action_owner_id);
     return {
       id: row.id,
+      publishedDate: row.published_date,
       sourceActionId: row.source_action_id,
       sourceActionTitle:
         actionTitleMap.get(row.source_action_id) || "Unknown action",
@@ -239,6 +276,7 @@ export async function getWorkspaceData(
 
   return {
     currentUser,
+    dateRange: { startDate, endDate },
     divisions,
     users,
     trends,

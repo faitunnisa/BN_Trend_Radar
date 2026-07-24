@@ -11,6 +11,11 @@ export type ActionStatus =
   | "needs_review"
   | "done";
 
+export interface DateRange {
+  startDate: string;
+  endDate: string;
+}
+
 export interface AppUser {
   id: string;
   displayName: string;
@@ -48,7 +53,7 @@ export interface StatusHistoryItem {
 
 export interface Trend {
   id: string;
-  submissionWeek: string;
+  observedDate: string;
   title: string;
   category: string;
   platform: string;
@@ -72,14 +77,14 @@ export interface Trend {
 
 export interface ActionItem {
   id: string;
-  workspaceWeek: string;
+  startDate: string;
+  endDate: string;
   sourceTrendId: string | null;
   sourceTrendTitle: string | null;
   title: string;
   accountableUserId: string;
   accountableName: string;
   accountableDivision: string;
-  workPeriod: string;
   status: ActionStatus;
   createdById: string;
   updatedById: string;
@@ -91,6 +96,7 @@ export interface ActionItem {
 
 export interface Learning {
   id: string;
+  publishedDate: string;
   sourceActionId: string;
   sourceActionTitle: string;
   sourceTrendId: string | null;
@@ -116,6 +122,7 @@ export interface SheetSyncStatus {
 
 export interface BootstrapData {
   currentUser: AppUser;
+  dateRange: DateRange;
   divisions: Division[];
   users: AppUser[];
   trends: Trend[];

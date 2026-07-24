@@ -39,11 +39,11 @@ export async function PATCH(
     const { error } = await supabaseAdmin
       .from("actions")
       .update({
-        workspace_week: input.workspaceWeek,
+        start_date: input.startDate,
+        end_date: input.endDate,
         source_trend_id: input.sourceTrendId || null,
         title: input.title,
         accountable_user_id: input.accountableUserId,
-        work_period: input.workPeriod,
         status: input.status,
         updated_by: user.id,
       })

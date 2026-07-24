@@ -56,7 +56,7 @@ create table if not exists public.app_sessions (
 
 create table if not exists public.trends (
   id uuid primary key default gen_random_uuid(),
-  submission_week text not null,
+  observed_date date not null default current_date,
   title text not null,
   category text not null,
   platform text not null,
@@ -106,16 +106,17 @@ create table if not exists public.trend_scores (
 
 create table if not exists public.actions (
   id uuid primary key default gen_random_uuid(),
-  workspace_week text not null,
+  start_date date not null default current_date,
+  end_date date not null default current_date,
   source_trend_id uuid references public.trends(id) on delete set null,
   title text not null,
   accountable_user_id uuid not null references public.app_users(id),
-  work_period text not null,
   status public.action_status not null default 'planned',
   created_by uuid not null references public.app_users(id),
   updated_by uuid not null references public.app_users(id),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint action_date_order check (start_date <= end_date)
 );
 
 create table if not exists public.learnings (
@@ -130,6 +131,7 @@ create table if not exists public.learnings (
   why_it_happened text,
   reusable_principle text not null,
   evidence_url text,
+  published_date date not null default current_date,
   published_at timestamptz not null default now()
 );
 
@@ -146,10 +148,11 @@ create table if not exists public.sheet_sync_queue (
 );
 
 create unique index if not exists idx_app_users_display_name_ci on public.app_users(lower(display_name));
-create index if not exists idx_trends_week on public.trends(submission_week);
+create index if not exists idx_trends_observed_date on public.trends(observed_date);
 create index if not exists idx_trends_status on public.trends(board_status);
-create index if not exists idx_actions_week on public.actions(workspace_week);
+create index if not exists idx_actions_date_range on public.actions(start_date, end_date);
 create index if not exists idx_actions_source_trend on public.actions(source_trend_id);
+create index if not exists idx_learnings_published_date on public.learnings(published_date);
 create index if not exists idx_sessions_hash on public.app_sessions(token_hash);
 create index if not exists idx_sync_status on public.sheet_sync_queue(status);
 

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const dateOnlySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Gunakan format tanggal YYYY-MM-DD.");
+
 export const roleSchema = z.enum(["contributor", "curator", "admin"]);
 export const trendStatusSchema = z.enum([
   "validate",
@@ -15,13 +19,22 @@ export const actionStatusSchema = z.enum([
   "done",
 ]);
 
+export const dateRangeSchema = z
+  .object({
+    startDate: dateOnlySchema,
+    endDate: dateOnlySchema,
+  })
+  .refine((value) => value.startDate <= value.endDate, {
+    message: "Tanggal mulai tidak boleh setelah tanggal akhir.",
+  });
+
 export const selectProfileSchema = z.object({
   userId: z.string().uuid(),
   pin: z.string().regex(/^\d{4}$/).optional(),
 });
 
 export const trendCreateSchema = z.object({
-  submissionWeek: z.string().min(2).max(40),
+  observedDate: dateOnlySchema,
   title: z.string().min(3).max(180),
   category: z.string().min(2).max(80),
   platform: z.string().min(2).max(80),
@@ -43,14 +56,18 @@ export const scoreSchema = z.object({
   feasibility: z.number().int().min(1).max(5),
 });
 
-export const actionInputSchema = z.object({
-  workspaceWeek: z.string().min(2).max(40),
-  sourceTrendId: z.string().uuid().nullable().optional(),
-  title: z.string().min(3).max(300),
-  accountableUserId: z.string().uuid(),
-  workPeriod: z.string().min(2).max(120),
-  status: z.enum(["planned", "in_progress", "needs_review"]),
-});
+export const actionInputSchema = z
+  .object({
+    startDate: dateOnlySchema,
+    endDate: dateOnlySchema,
+    sourceTrendId: z.string().uuid().nullable().optional(),
+    title: z.string().min(3).max(300),
+    accountableUserId: z.string().uuid(),
+    status: z.enum(["planned", "in_progress", "needs_review"]),
+  })
+  .refine((value) => value.startDate <= value.endDate, {
+    message: "Tanggal mulai action tidak boleh setelah tanggal selesai.",
+  });
 
 export const learningSchema = z.object({
   title: z.string().min(3).max(250),

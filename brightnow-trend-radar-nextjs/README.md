@@ -1,71 +1,54 @@
-# BrightNow Trend Radar — Next.js + Supabase
+# BrightNow Trend Radar V7 — Next.js + Supabase
 
-Repo ini adalah versi functional MVP dari prototype V6.
+Repo ini adalah functional MVP dengan **global date-range filter**. Tidak ada lagi daftar minggu yang harus ditambah manual, sehingga aplikasi dapat digunakan terus-menerus.
 
-## Yang sudah tersedia
+## Perubahan utama V7
 
-- Next.js App Router
-- API backend menggunakan Next.js Route Handlers
-- Supabase sebagai database bersama
+- Filter global memakai **From Date → To Date**.
+- Quick filter: Last 7 Days, Last 30 Days, This Month, dan This Quarter.
+- Trend memiliki **Trend Date** (`observed_date`).
+- Action memiliki **Start Date** dan **End Date**.
+- Learning memiliki **Published Date**.
+- Dashboard, Trend Board, Leaderboard, Action Pipeline, dan Learning Library mengikuti rentang tanggal yang dipilih.
+- Action ditampilkan bila periodenya beririsan dengan rentang tanggal filter.
+- Existing V6 data tetap aman melalui migration SQL.
+
+## Fitur lain yang tetap tersedia
+
 - Profile picker tanpa signup
-- Contributor masuk tanpa PIN
+- Contributor tanpa PIN
 - Curator dan Admin menggunakan PIN
-- Secure session cookie
+- Shared Supabase database
 - One vote per user per trend
-- Contributor dapat menentukan dan mengubah Trend Board status
-- Curator/Admin dapat memberikan Opportunity Score
-- Contributor dapat membuat dan mengedit Action Pipeline
-- Action memiliki Source Trend
-- Hanya Action Owner yang dapat menyelesaikan action
-- Saat action diselesaikan, learning langsung terbit
-- Upload profile picture ke private Supabase Storage
-- Admin mengelola users dan divisions
+- Contributor dapat mengubah Trend Board status
+- Curator/Admin memberikan Opportunity Score
+- Trend → Action → Learning lineage
+- Action Owner langsung menerbitkan learning saat action selesai
+- Private avatar storage
+- Admin user/division management
 - Google Sheets mirror dengan retry queue
-- UI mengikuti prototype V6 dengan sidebar kiri dan logo BrightNow
 
 ## File penting
 
 ```text
-src/components/TrendRadarApp.tsx   UI utama
-src/app/api/                       Backend API
-src/lib/                           Session, Supabase, sync, validation
-supabase/schema.sql                Struktur database
-supabase/seed.sql                  User awal dan demo PIN
-google-apps-script/Code.gs         Google Sheets connector
-PANDUAN_DEPLOY_ID.md               Panduan klik-per-klik
-.env.example                       Daftar secret yang perlu diisi
+src/components/TrendRadarApp.tsx                 UI utama
+src/app/api/                                     Backend API
+src/lib/                                         Session, database, sync, validation
+supabase/schema.sql                              Schema untuk instalasi baru
+supabase/migrations/20260724_date_range_filter.sql  Migration dari V6
+supabase/seed.sql                                Initial user
+google-apps-script/Code.gs                       Connector Google Sheets
+PANDUAN_UPDATE_V7_DATE_FILTER_ID.md              Panduan update app yang sudah online
+PANDUAN_DEPLOY_ID.md                             Panduan deployment dari awal
 ```
 
-## Demo login setelah seed.sql
+## Urutan update dari V6
 
-- Fathiya — Admin — PIN `1234`
-- Tia — Curator — PIN `2468`
-- Contributor lain tidak menggunakan PIN
+1. Jalankan migration SQL di Supabase.
+2. Replace source code dengan repo V7.
+3. Commit dan push ke GitHub.
+4. Vercel deploy otomatis.
+5. Update Apps Script lalu buat deployment version baru.
+6. Test date filter dan existing data.
 
-Ganti PIN setelah aplikasi berhasil online.
-
-## Local development
-
-```bash
-cp .env.example .env.local
-npm install
-npm run dev
-```
-
-Buka `http://localhost:3000`.
-
-## Build check
-
-```bash
-npm run typecheck
-npm run build
-```
-
-## Catatan keamanan
-
-- `SUPABASE_SECRET_KEY` hanya digunakan di server.
-- Jangan menambahkan awalan `NEXT_PUBLIC_` pada secret key.
-- Jangan upload `.env.local` ke GitHub.
-- Browser tidak mengakses tabel Supabase secara langsung.
-- Contributor tanpa PIN cocok untuk trusted internal squad, bukan strong authentication.
-- Untuk penggunaan bisnis resmi, periksa plan Vercel yang sesuai.
+Baca `PANDUAN_UPDATE_V7_DATE_FILTER_ID.md` sebelum mengganti kode production.

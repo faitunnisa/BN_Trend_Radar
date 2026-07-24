@@ -14,6 +14,7 @@ import type {
   AppUser,
   BootstrapData,
   Division,
+  DateRange,
   Learning,
   Trend,
   TrendScoreInput,
@@ -21,36 +22,27 @@ import type {
   UserRole,
 } from "@/lib/types";
 
-const WEEKS = [
-  {
-    id: "2026-W30",
-    label: "Week 4 · 20–26 Jul 2026",
-    short: "W4 Jul",
-    mission: "School Comeback Signals",
-    copy: "Find behavior, language, and mini rituals Gen Z use to prepare for a new week.",
-  },
-  {
-    id: "2026-W31",
-    label: "Week 5 · 27 Jul–2 Aug 2026",
-    short: "W5 Jul",
-    mission: "Payday & Double Date",
-    copy: "Spot how Gen Z talks about affordable rewards and getting ready to go out.",
-  },
-  {
-    id: "2026-W32",
-    label: "Week 1 · 3–9 Aug 2026",
-    short: "W1 Aug",
-    mission: "Back-to-School Reality",
-    copy: "Collect real school problems, language, and routines that can become initiatives.",
-  },
-  {
-    id: "2026-W33",
-    label: "Week 2 · 10–16 Aug 2026",
-    short: "W2 Aug",
-    mission: "Teen Beauty Signals",
-    copy: "Find how teenagers discuss oil, pores, dullness, and quick confidence boosts.",
-  },
-] as const;
+const DEFAULT_RANGE_DAYS = 7;
+
+function toDateInputValue(date: Date): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function addDays(dateValue: string, days: number): string {
+  const date = new Date(`${dateValue}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return toDateInputValue(date);
+}
+
+function createDefaultDateRange(): DateRange {
+  const endDate = toDateInputValue(new Date());
+  return {
+    startDate: addDays(endDate, -(DEFAULT_RANGE_DAYS - 1)),
+    endDate,
+  };
+}
+
 
 const TREND_STATUSES: TrendStatus[] = [
   "validate",
@@ -101,7 +93,7 @@ const PAGE_COPY: Record<
   actions: {
     title: "Action Pipeline",
     subtitle:
-      "Track the original trend, accountable person, work period, status, and published learning.",
+      "Track the original trend, accountable person, action dates, status, and published learning.",
   },
   leaderboard: {
     title: "Leaderboard",
@@ -147,7 +139,7 @@ type View =
   | "settings";
 
 type TrendForm = {
-  submissionWeek: string;
+  observedDate: string;
   title: string;
   category: string;
   platform: string;
@@ -161,11 +153,11 @@ type TrendForm = {
 
 type ActionForm = {
   id: string | null;
-  workspaceWeek: string;
+  startDate: string;
+  endDate: string;
   sourceTrendId: string;
   title: string;
   accountableUserId: string;
-  workPeriod: string;
   status: Exclude<ActionStatus, "done">;
 };
 
@@ -233,6 +225,23 @@ function formatDate(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatDateOnly(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatDateRange(startDate: string, endDate: string): string {
+  if (startDate === endDate) return formatDateOnly(startDate);
+  return `${formatDateOnly(startDate)} – ${formatDateOnly(endDate)}`;
+}
+
+function dateIsInside(value: string, range: DateRange): boolean {
+  return value >= range.startDate && value <= range.endDate;
 }
 
 async function api<T>(
@@ -470,7 +479,8 @@ export function TrendRadarApp() {
   );
   const [workspace, setWorkspace] =
     useState<BootstrapData | null>(null);
-  const [week, setWeek] = useState<string>(WEEKS[0].id);
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: "", endDate: "" });
+  const [dateDraft, setDateDraft] = useState<DateRange>({ startDate: "", endDate: "" });
   const [view, setView] = useState<View>("dashboard");
   const [mobileNav, setMobileNav] = useState(false);
   const [initializing, setInitializing] = useState(true);
@@ -498,7 +508,7 @@ export function TrendRadarApp() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const [trendForm, setTrendForm] = useState<TrendForm>({
-    submissionWeek: WEEKS[0].id,
+    observedDate: "",
     title: "",
     category: "Teen Life",
     platform: "TikTok",
@@ -512,11 +522,11 @@ export function TrendRadarApp() {
 
   const [actionForm, setActionForm] = useState<ActionForm>({
     id: null,
-    workspaceWeek: WEEKS[0].id,
+    startDate: "",
+    endDate: "",
     sourceTrendId: "",
     title: "",
     accountableUserId: "",
-    workPeriod: "Week 1 Aug",
     status: "planned",
   });
 
@@ -564,6 +574,10 @@ export function TrendRadarApp() {
     setInitializing(true);
     setError("");
     try {
+      const initialRange = createDefaultDateRange();
+      setDateRange(initialRange);
+      setDateDraft(initialRange);
+
       const profileResponse = await api<{ users: AppUser[] }>(
         "/api/public/profiles",
       );
@@ -578,7 +592,7 @@ export function TrendRadarApp() {
         };
         setCurrentUser(result.user);
         setProfileName(result.user.displayName);
-        await loadWorkspace(WEEKS[0].id);
+        await loadWorkspace(initialRange);
       }
     } catch (caught) {
       setError(
@@ -598,14 +612,15 @@ export function TrendRadarApp() {
     setProfiles(result.users);
   }
 
-  async function loadWorkspace(targetWeek = week) {
+  async function loadWorkspace(targetRange: DateRange = dateRange) {
     const result = await api<BootstrapData>(
-      `/api/bootstrap?week=${encodeURIComponent(targetWeek)}`,
+      `/api/bootstrap?startDate=${encodeURIComponent(targetRange.startDate)}&endDate=${encodeURIComponent(targetRange.endDate)}`,
     );
     setWorkspace(result);
     setCurrentUser(result.currentUser);
     setProfileName(result.currentUser.displayName);
-    setWeek(targetWeek);
+    setDateRange(targetRange);
+    setDateDraft(targetRange);
   }
 
   async function runMutation(
@@ -641,7 +656,9 @@ export function TrendRadarApp() {
       );
       setCurrentUser(result.user);
       setProfileName(result.user.displayName);
-      await loadWorkspace(week);
+      await loadWorkspace(
+        dateRange.startDate ? dateRange : createDefaultDateRange(),
+      );
       setToast(`Welcome, ${result.user.displayName}`);
     } catch (caught) {
       setError(
@@ -660,21 +677,50 @@ export function TrendRadarApp() {
     await loadProfiles();
   }
 
-  async function changeWeek(value: string) {
+  async function applyDateRange(nextRange: DateRange) {
+    if (!nextRange.startDate || !nextRange.endDate) {
+      setError("Pilih tanggal mulai dan tanggal akhir.");
+      return;
+    }
+    if (nextRange.startDate > nextRange.endDate) {
+      setError("Tanggal mulai tidak boleh setelah tanggal akhir.");
+      return;
+    }
+
     setBusy(true);
     setCategoryFilter("All");
+    setError("");
     try {
-      await loadWorkspace(value);
-      setToast(
-        `Showing ${WEEKS.find((item) => item.id === value)?.short}`,
-      );
+      await loadWorkspace(nextRange);
+      setToast(`Showing ${formatDateRange(nextRange.startDate, nextRange.endDate)}`);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Week gagal dimuat.",
+        caught instanceof Error ? caught.message : "Rentang tanggal gagal dimuat.",
       );
     } finally {
       setBusy(false);
     }
+  }
+
+  function applyPreset(value: string) {
+    const today = toDateInputValue(new Date());
+    let nextRange: DateRange;
+
+    if (value === "30d") {
+      nextRange = { startDate: addDays(today, -29), endDate: today };
+    } else if (value === "month") {
+      nextRange = { startDate: `${today.slice(0, 7)}-01`, endDate: today };
+    } else if (value === "quarter") {
+      const date = new Date(`${today}T12:00:00`);
+      const quarterStartMonth = Math.floor(date.getMonth() / 3) * 3;
+      date.setMonth(quarterStartMonth, 1);
+      nextRange = { startDate: toDateInputValue(date), endDate: today };
+    } else {
+      nextRange = { startDate: addDays(today, -6), endDate: today };
+    }
+
+    setDateDraft(nextRange);
+    void applyDateRange(nextRange);
   }
 
   const isAdmin = currentUser?.role === "admin";
@@ -682,8 +728,7 @@ export function TrendRadarApp() {
     currentUser?.role === "admin" ||
     currentUser?.role === "curator";
 
-  const currentWeek =
-    WEEKS.find((item) => item.id === week) || WEEKS[0];
+  const periodLabel = formatDateRange(dateRange.startDate, dateRange.endDate);
 
   const activeUsers =
     workspace?.users.filter((user) => user.isActive) || [];
@@ -744,7 +789,7 @@ export function TrendRadarApp() {
 
   function openTrendForm() {
     setTrendForm({
-      submissionWeek: week,
+      observedDate: toDateInputValue(new Date()),
       title: "",
       category: "Teen Life",
       platform: "TikTok",
@@ -760,6 +805,10 @@ export function TrendRadarApp() {
 
   async function submitTrend(event: FormEvent) {
     event.preventDefault();
+    const nextRange = dateIsInside(trendForm.observedDate, dateRange)
+      ? dateRange
+      : { startDate: trendForm.observedDate, endDate: trendForm.observedDate };
+
     await runMutation(
       async () => {
         await api("/api/trends", {
@@ -767,12 +816,10 @@ export function TrendRadarApp() {
           body: JSON.stringify(trendForm),
         });
         setTrendModal(false);
-        if (trendForm.submissionWeek !== week) {
-          await loadWorkspace(trendForm.submissionWeek);
-        }
+        await loadWorkspace(nextRange);
       },
       "Trend submitted",
-      trendForm.submissionWeek === week,
+      false,
     );
   }
 
@@ -825,12 +872,12 @@ export function TrendRadarApp() {
   function openCreateAction(sourceTrend?: Trend) {
     setActionForm({
       id: null,
-      workspaceWeek: week,
+      startDate: toDateInputValue(new Date()),
+      endDate: addDays(toDateInputValue(new Date()), 6),
       sourceTrendId: sourceTrend?.id || "",
       title: sourceTrend?.suggestedAction || "",
       accountableUserId: currentUser?.id || "",
-      workPeriod: "Week 1 Aug",
-      status: "planned",
+        status: "planned",
     });
     setActionModal(true);
     setTrendDetail(null);
@@ -839,11 +886,11 @@ export function TrendRadarApp() {
   function openEditAction(action: ActionItem) {
     setActionForm({
       id: action.id,
-      workspaceWeek: action.workspaceWeek,
+      startDate: action.startDate,
+      endDate: action.endDate,
       sourceTrendId: action.sourceTrendId || "",
       title: action.title,
       accountableUserId: action.accountableUserId,
-      workPeriod: action.workPeriod,
       status:
         action.status === "done" ? "needs_review" : action.status,
     });
@@ -861,11 +908,11 @@ export function TrendRadarApp() {
         await api(path, {
           method: actionForm.id ? "PATCH" : "POST",
           body: JSON.stringify({
-            workspaceWeek: actionForm.workspaceWeek,
+            startDate: actionForm.startDate,
+            endDate: actionForm.endDate,
             sourceTrendId: actionForm.sourceTrendId || null,
             title: actionForm.title,
             accountableUserId: actionForm.accountableUserId,
-            workPeriod: actionForm.workPeriod,
             status: actionForm.status,
           }),
         });
@@ -1296,22 +1343,50 @@ export function TrendRadarApp() {
             <p>{page.subtitle}</p>
           </div>
           <div className="top-actions">
-            <div className="weekbox">
-              <span>WEEK</span>
-              <select
-                value={week}
+            <div className="datebox">
+              <label>
+                <span>FROM</span>
+                <input
+                  type="date"
+                  value={dateDraft.startDate}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setDateDraft({ ...dateDraft, startDate: event.target.value })
+                  }
+                />
+              </label>
+              <span className="date-arrow">→</span>
+              <label>
+                <span>TO</span>
+                <input
+                  type="date"
+                  value={dateDraft.endDate}
+                  disabled={busy}
+                  onChange={(event) =>
+                    setDateDraft({ ...dateDraft, endDate: event.target.value })
+                  }
+                />
+              </label>
+              <button
+                className="btn btn-dark btn-sm"
                 disabled={busy}
-                onChange={(event) =>
-                  void changeWeek(event.target.value)
-                }
+                onClick={() => void applyDateRange(dateDraft)}
               >
-                {WEEKS.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
+                Apply
+              </button>
             </div>
+            <select
+              className="preset-select"
+              defaultValue="7d"
+              disabled={busy}
+              onChange={(event) => applyPreset(event.target.value)}
+              aria-label="Quick date range"
+            >
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="month">This month</option>
+              <option value="quarter">This quarter</option>
+            </select>
             <div
               className={`sync-pill ${
                 workspace.sheetSync.configured
@@ -1366,7 +1441,7 @@ export function TrendRadarApp() {
             workspace={workspace}
             topTrends={topTrends}
             leaderboard={leaderboard}
-            currentWeek={currentWeek}
+            periodLabel={periodLabel}
             currentUser={currentUser}
             canScore={canScore}
             onOpenTrend={setTrendDetail}
@@ -1543,7 +1618,7 @@ export function TrendRadarApp() {
             </div>
             <div className="info-block">
               <strong>Interpretation</strong>
-              80–100 Activate now · 60–79 Test this week · 40–59
+              80–100 Activate now · 60–79 Test soon · 40–59
               Watchlist · Below 40 Archive.
             </div>
           </div>
@@ -1642,7 +1717,7 @@ function DashboardView({
   workspace,
   topTrends,
   leaderboard,
-  currentWeek,
+  periodLabel,
   currentUser,
   canScore,
   onOpenTrend,
@@ -1659,7 +1734,7 @@ function DashboardView({
     ready: number;
     points: number;
   }>;
-  currentWeek: (typeof WEEKS)[number];
+  periodLabel: string;
   currentUser: AppUser;
   canScore: boolean;
   onOpenTrend: (trend: Trend) => void;
@@ -1681,7 +1756,7 @@ function DashboardView({
     [
       "Submissions",
       workspace.trends.length,
-      "Added in selected week",
+      "Inside selected dates",
       "✦",
     ],
     [
@@ -1723,7 +1798,7 @@ function DashboardView({
             <div className="hero-copy">
               <div className="eyebrow">
                 <span className="eyebrow-dot" />
-                <span>Signal of the week</span>
+                <span>Signal of the period</span>
               </div>
               <h2>
                 {hero ? hero.title : "Discover, create, act."}
@@ -1731,7 +1806,7 @@ function DashboardView({
               <p>
                 {hero
                   ? hero.relevance
-                  : "No signal has been submitted for this week yet."}
+                  : "No signal has been submitted for this date range yet."}
               </p>
               <div className="hero-actions">
                 <button
@@ -1786,7 +1861,7 @@ function DashboardView({
             {!topTrends.length && (
               <Empty
                 title="No trends yet"
-                copy="Submit the first signal for this week."
+                copy="Submit the first signal for this date range."
               />
             )}
           </article>
@@ -1796,10 +1871,10 @@ function DashboardView({
           <article className="card sage mission">
             <div className="eyebrow">
               <span className="eyebrow-dot" />
-              <span>Weekly mission</span>
+              <span>Selected-period mission</span>
             </div>
-            <h3>{currentWeek.mission}</h3>
-            <p>{currentWeek.copy}</p>
+            <h3>Trend Hunt · {periodLabel}</h3>
+            <p>Collect the most useful Gen Z and social signals inside the selected date range.</p>
             <div className="progress">
               <span
                 style={{
@@ -1820,7 +1895,7 @@ function DashboardView({
             <div className="section-head">
               <div>
                 <h2>Squad leaderboard</h2>
-                <p>Impact points for the selected week.</p>
+                <p>Impact points for the selected date range.</p>
               </div>
             </div>
             <div className="leader-list">
@@ -1889,6 +1964,7 @@ function TrendCard({
           <div className="chips">
             <span className="chip">{trend.category}</span>
             <span className="chip">{trend.momentum}</span>
+            <span className="chip">{formatDateOnly(trend.observedDate)}</span>
           </div>
           <h3>{trend.title}</h3>
           <p>{trend.evidenceDescription || trend.sourceUrl}</p>
@@ -2072,7 +2148,7 @@ function ActionsView({
   onOpenLearning: (id: string) => void;
 }) {
   const metrics = [
-    ["Actions", actions.length, "Selected week", "↗"],
+    ["Actions", actions.length, "Selected dates", "↗"],
     [
       "In progress",
       actions.filter((item) => item.status === "in_progress")
@@ -2128,7 +2204,7 @@ function ActionsView({
                 <th>Action</th>
                 <th>Source trend</th>
                 <th>Accountable</th>
-                <th>Work period</th>
+                <th>Action dates</th>
                 <th>Status</th>
                 <th>Learning</th>
                 <th>Updated by</th>
@@ -2156,7 +2232,7 @@ function ActionsView({
                     )}
                   </td>
                   <td>{action.accountableName}</td>
-                  <td>{action.workPeriod}</td>
+                  <td>{formatDateRange(action.startDate, action.endDate)}</td>
                   <td>
                     <span
                       className={`status ${
@@ -2227,7 +2303,7 @@ function ActionsView({
           </table>
           {!actions.length && (
             <Empty
-              title="No actions this week"
+              title="No actions in this date range"
               copy="Create one from a trend or as a standalone action."
             />
           )}
@@ -2270,7 +2346,7 @@ function LeaderboardView({
             }}
           >
             {mvp
-              ? `${mvp.user.displayName} is this week’s sharpest spotter.`
+              ? `${mvp.user.displayName} is this period’s sharpest spotter.`
               : "No MVP yet."}
           </h2>
           <p style={{ fontSize: 10, maxWidth: 600 }}>
@@ -2286,7 +2362,7 @@ function LeaderboardView({
           </div>
           <h3>Trend Hunt Lunch</h3>
           <p>
-            Unlock the squad reward at 300 weekly impact points.
+            Unlock the squad reward at 300 impact points in the selected period.
           </p>
           <div className="progress">
             <span style={{ width: "79%" }} />
@@ -2947,22 +3023,15 @@ function TrendFormView({
         />
       </div>
       <div className="field">
-        <label>Submission week</label>
-        <select
-          value={form.submissionWeek}
+        <label>Trend date</label>
+        <input
+          required
+          type="date"
+          value={form.observedDate}
           onChange={(event) =>
-            setForm({
-              ...form,
-              submissionWeek: event.target.value,
-            })
+            setForm({ ...form, observedDate: event.target.value })
           }
-        >
-          {WEEKS.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+        />
       </div>
       <div className="field">
         <label>Trend category</label>
@@ -3117,6 +3186,7 @@ function TrendDetailView({
       <div className="chips" style={{ marginBottom: 11 }}>
         <span className="chip">{trend.category}</span>
         <span className="chip">{trend.momentum}</span>
+        <span className="chip">{formatDateOnly(trend.observedDate)}</span>
         <span className="chip">
           {statusLabel(trend.boardStatus)}
         </span>
@@ -3148,7 +3218,7 @@ function TrendDetailView({
               <div className="linked-action" key={action.id}>
                 <strong>{action.title}</strong>
                 <span>
-                  {action.accountableName} · {action.workPeriod} ·{" "}
+                  {action.accountableName} · {formatDateRange(action.startDate, action.endDate)} ·{" "}
                   {statusLabel(action.status)}
                 </span>
               </div>
@@ -3363,14 +3433,26 @@ function ActionFormView({
         </select>
       </div>
       <div className="field">
-        <label>Work period</label>
+        <label>Start date</label>
         <input
           required
-          value={form.workPeriod}
+          type="date"
+          value={form.startDate}
           onChange={(event) =>
-            setForm({ ...form, workPeriod: event.target.value })
+            setForm({ ...form, startDate: event.target.value })
           }
-          placeholder="e.g. Week 1 August"
+        />
+      </div>
+      <div className="field">
+        <label>End date</label>
+        <input
+          required
+          type="date"
+          min={form.startDate}
+          value={form.endDate}
+          onChange={(event) =>
+            setForm({ ...form, endDate: event.target.value })
+          }
         />
       </div>
       <div className="field full">

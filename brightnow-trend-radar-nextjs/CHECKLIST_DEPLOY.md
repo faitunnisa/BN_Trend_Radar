@@ -1,38 +1,26 @@
-# Quick Deployment Checklist
+# Quick Checklist — BrightNow Trend Radar V7
 
-## Supabase
-- [ ] Create project
+## Untuk aplikasi yang sudah online
+- [ ] Download dan extract repo V7
+- [ ] Supabase: run `supabase/migrations/20260724_date_range_filter.sql`
+- [ ] Pastikan migration menampilkan Success
+- [ ] Replace file project lokal dengan file V7
+- [ ] Commit dan Push ke repository GitHub yang sama
+- [ ] Tunggu Vercel deployment berstatus Ready
+- [ ] Update `google-apps-script/Code.gs`
+- [ ] Apps Script: Deploy → Manage deployments → Edit → New version → Deploy
+- [ ] Test Last 7 Days
+- [ ] Test custom From dan To date
+- [ ] Submit trend dengan Trend Date
+- [ ] Create action dengan Start dan End Date
+- [ ] Edit tanggal action lama hasil migration
+- [ ] Complete action dan cek Learning Library
+- [ ] Cek Google Sheet
+
+## Untuk deployment baru
 - [ ] Run `supabase/schema.sql`
 - [ ] Run `supabase/seed.sql`
-- [ ] Copy Project URL
-- [ ] Copy `sb_secret_...` key
-- [ ] Confirm `avatars` bucket exists
-
-## Google Sheets
-- [ ] Create Sheet
-- [ ] Paste `google-apps-script/Code.gs`
-- [ ] Deploy as Web App
-- [ ] Copy `/exec` URL
-
-## GitHub
-- [ ] Add folder to GitHub Desktop
-- [ ] Publish as private repository
-
-## Vercel
-- [ ] Import GitHub repository
-- [ ] Add `SUPABASE_URL`
-- [ ] Add `SUPABASE_SECRET_KEY`
-- [ ] Add `SESSION_COOKIE_NAME=bn_session`
-- [ ] Add `GOOGLE_SHEETS_WEBHOOK_URL`
-- [ ] Deploy
-
-## Test
-- [ ] Login as Fathiya using PIN 1234
-- [ ] Change demo PINs
-- [ ] Add real team users
-- [ ] Submit trend
-- [ ] Test cross-device vote
-- [ ] Create linked action
-- [ ] Complete action as owner
-- [ ] Confirm learning is published
-- [ ] Confirm Google Sheet receives rows
+- [ ] Add Supabase environment variables di Vercel
+- [ ] Deploy Apps Script
+- [ ] Push repo ke GitHub
+- [ ] Import repository di Vercel
