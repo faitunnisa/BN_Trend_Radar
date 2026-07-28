@@ -3210,9 +3210,40 @@ function TrendDetailView({
             <h3>What’s happening</h3>
             <p>
               {trend.evidenceDescription ||
-                trend.sourceUrl ||
                 "No evidence description added."}
             </p>
+          </div>
+          <div className="detail-block">
+            <h3>Evidence / source</h3>
+            {trend.sourceUrl ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <a
+                  className="source-link"
+                  href={trend.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    width: "fit-content",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  Open submitted evidence ↗
+                </a>
+                <p
+                  style={{
+                    wordBreak: "break-all",
+                    fontSize: 8,
+                    opacity: 0.72,
+                  }}
+                >
+                  {trend.sourceUrl}
+                </p>
+              </div>
+            ) : (
+              <p>No source link was submitted.</p>
+            )}
           </div>
           <div className="detail-block">
             <h3>Why BrightNow should care</h3>
